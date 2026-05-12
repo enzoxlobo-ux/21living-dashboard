@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>21Living Dashboard — ZH3 Mídia Inteligente</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* === BASE === */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:      #0f1117;
+  --card:    #1a1d27;
+  --accent:  #6366f1;
+  --accent2: #818cf8;
+  --text:    #e2e8f0;
+  --muted:   #94a3b8;
+  --border:  #2d3148;
+  --green:   #22c55e;
+  --yellow:  #f59e0b;
+  --red:     #ef4444;
+  --sidebar: 230px;
+  --header:  56px;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* === LOADER === */
+#loader { position: fixed; inset: 0; z-index: 999; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+.spinner { width: 44px; height: 44px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .75s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loader-text { color: var(--muted); font-size: 14px; }
+
+/* === ERROR === */
+#error-panel { display: none; position: fixed; inset: 0; z-index: 998; background: var(--bg); align-items: center; justify-content: center; }
+.error-box { background: var(--card); border: 1px solid var(--red); border-radius: 16px; padding: 36px; max-width: 500px; text-align: center; }
+.error-icon { font-size: 44px; margin-bottom: 12px; }
+.error-title { font-size: 20px; font-weight: 700; color: var(--red); margin-bottom: 10px; }
+.error-msg { color: var(--muted); font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+.error-retry { margin-top: 20px; padding: 8px 20px; border-radius: 8px; border: none; background: var(--accent); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+/* === HEADER === */
+.header { position: fixed; top: 0; left: 0; right: 0; height: var(--header); background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 14px; z-index: 100; }
+.header-logo { height: 30px; width: auto; display: block; }
+.header-divider { width: 1px; height: 24px; background: var(--border); }
+.header-title { font-size: 16px; font-weight: 700; }
+.header-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.header-status { margin-left: auto; font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.header-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* === SIDEBAR === */
+.sidebar { position: fixed; top: var(--header); left: 0; bottom: 0; width: var(--sidebar); background: var(--card); border-right: 1px solid var(--border); overflow-y: auto; z-index: 90; padding: 10px 8px 20px; }
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.nav-section { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; padding: 12px 10px 4px; }
+.nav-item { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 8px; cursor: pointer; color: var(--muted); font-size: 13px; font-weight: 500; transition: background .15s, color .15s; user-select: none; }
+.nav-item:hover { background: rgba(99,102,241,.1); color: var(--text); }
+.nav-item.active { background: rgba(99,102,241,.18); color: var(--accent2); }
+.nav-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+.nav-badge { margin-left: auto; min-width: 20px; height: 20px; background: var(--red); color: #fff; font-size: 10px; font-weight: 800; padding: 0 5px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
+
+/* === OPEN TASKS FILTERS === */
+.mod-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; }
+.mod-filter-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.mod-filter-sep { width: 1px; height: 20px; background: var(--border); }
+
+/* === MAIN === */
+.main { margin-left: var(--sidebar); margin-top: var(--header); padding: 20px; min-height: calc(100vh - var(--header)); }
+
+/* === FILTER BAR === */
+.filter-bar { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+.filter-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.filter-sep { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
+select, input[type="date"], input[type="month"] { background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 6px 10px; font-size: 13px; outline: none; cursor: pointer; transition: border-color .15s; }
+select:focus, input:focus { border-color: var(--accent); }
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator { filter: invert(.7); }
+.btn { padding: 6px 14px; border-radius: 8px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent2); }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.btn-ghost:hover { color: var(--text); border-color: var(--accent); }
+.filter-count { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+/* === MODULE === */
+.module { display: none; }
+.module.active { display: block; }
+.mod-title { font-size: 20px; font-weight: 700; margin-bottom: 2px; }
+.mod-sub { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+
+/* === CARDS === */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.card-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 14px; }
+
+/* === KPI GRID === */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; border-top: 2px solid var(--border); }
+.kpi-card.accent  { border-top-color: var(--accent); }
+.kpi-card.green   { border-top-color: var(--green); }
+.kpi-card.yellow  { border-top-color: var(--yellow); }
+.kpi-card.red     { border-top-color: var(--red); }
+.kpi-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+.kpi-value { font-size: 28px; font-weight: 800; line-height: 1; color: var(--text); }
+.kpi-unit { font-size: 14px; font-weight: 500; color: var(--muted); }
+.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 5px; }
+
+/* === GRIDS === */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+/* === TABLES === */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+tbody td { padding: 10px 12px; border-bottom: 1px solid rgba(45,49,72,.45); }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: rgba(99,102,241,.04); }
+.t-num { text-align: right; font-variant-numeric: tabular-nums; }
+.t-center { text-align: center; }
+
+/* === BADGES === */
+.badge { display: inline-flex; align-items: center; justify-content: center; padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.b-green  { background: rgba(34,197,94,.15);  color: var(--green); }
+.b-yellow { background: rgba(245,158,11,.15); color: var(--yellow); }
+.b-red    { background: rgba(239,68,68,.15);  color: var(--red); }
+.b-blue   { background: rgba(99,102,241,.15); color: var(--accent2); }
+.b-gray   { background: rgba(148,163,184,.12);color: var(--muted); }
+
+/* === PROGRESS === */
+.prog { height: 6px; border-radius: 3px; background: rgba(45,49,72,.8); overflow: hidden; }
+.prog-fill { height: 100%; border-radius: 3px; }
+
+/* === CHARTS === */
+.chart-wrap { position: relative; width: 100%; }
+.chart-wrap canvas { display: block; }
+
+/* === OCCUPATION (in M2) === */
+.occ-bar-inline { height: 6px; border-radius: 3px; background: rgba(45,49,72,.8); overflow: hidden; display: inline-block; width: 80px; vertical-align: middle; margin-right: 6px; }
+.occ-bar-fill { height: 100%; border-radius: 3px; }
+
+/* === CONFIG TABLE === */
+.cfg-table input[type="number"] { width: 100px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 4px 8px; font-size: 13px; outline: none; }
+.cfg-table input[type="number"]:focus { border-color: var(--accent); }
+.cfg-save-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.save-hint { font-size: 12px; color: var(--muted); }
+
+/* === PERIOD SELECTOR (M9/M10) === */
+.period-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.period-tab { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s; }
+.period-tab.active, .period-tab:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* === FLOW SELECT (M10) === */
+.flow-selector { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.flow-chip { padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 11px; font-weight: 600; cursor: pointer; transition: all .15s; }
+.flow-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* === MISC === */
+.no-data { text-align: center; padding: 48px 20px; color: var(--muted); font-size: 14px; }
+.rank-num { width: 24px; height: 24px; border-radius: 50%; background: var(--accent); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #fff; flex-shrink: 0; }
+.legend-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.inline-label { font-size: 11px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="spinner"></div>
+  <div class="loader-text">Carregando dados da planilha…</div>
+</div>
+
+<!-- ERROR -->
+<div id="error-panel">
+  <div class="error-box">
+    <div class="error-icon">⚠️</div>
+    <div class="error-title">Falha ao carregar dados</div>
+    <div class="error-msg" id="error-msg"></div>
+    <button class="error-retry" onclick="init()">Tentar novamente</button>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header class="header">
+  <img src="zh3-logo.png" alt="ZH3" class="header-logo">
+  <div class="header-divider"></div>
+  <div>
+    <div class="header-title">21Living Dashboard</div>
+    <div class="header-sub">ZH3 Mídia Inteligente</div>
+  </div>
+  <div class="header-status" id="header-status" style="display:none">
+    <div class="header-dot"></div>
+    <span id="header-rows">—</span> registros
+  </div>
+</header>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="nav-section">Visão Geral</div>
+  <div class="nav-item active" data-module="M1"><span class="nav-icon">📊</span> KPIs Gerais</div>
+
+  <div class="nav-section">Operacional</div>
+  <div class="nav-item" data-module="M11"><span class="nav-icon">📋</span> Tarefas em Aberto <span class="nav-badge" id="badge-M11">0</span></div>
+
+  <div class="nav-section">Performance</div>
+  <div class="nav-item" data-module="M2"><span class="nav-icon">👥</span> Colaboradores</div>
+  <div class="nav-item" data-module="M3"><span class="nav-icon">🏢</span> Por Cliente</div>
+  <div class="nav-item" data-module="M4"><span class="nav-icon">🔄</span> Fluxos de Trabalho</div>
+
+  <div class="nav-section">Análise</div>
+  <div class="nav-item" data-module="M6"><span class="nav-icon">📈</span> Evolução Mensal</div>
+  <div class="nav-item" data-module="M9"><span class="nav-icon">📅</span> Evolutivo de Tarefas</div>
+  <div class="nav-item" data-module="M10"><span class="nav-icon">🔀</span> Comparativo por Fluxo</div>
+
+  <div class="nav-section">Configuração</div>
+  <div class="nav-item" data-module="MCFG"><span class="nav-icon">⚙️</span> Custo / Hora Homem</div>
+</nav>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <span class="filter-label">Período:</span>
+    <select id="filter-mode">
+      <option value="month">Mês/Ano</option>
+      <option value="custom">Personalizado</option>
+      <option value="all">Todos os dados</option>
+    </select>
+    <div id="fg-month" style="display:flex;align-items:center;gap:8px">
+      <input type="month" id="filter-month">
+    </div>
+    <div id="fg-custom" style="display:none;align-items:center;gap:8px">
+      <span class="filter-label">De:</span><input type="date" id="filter-start">
+      <span class="filter-label">Até:</span><input type="date" id="filter-end">
+    </div>
+
+    <div class="filter-sep"></div>
+
+    <span class="filter-label">Pessoa:</span>
+    <select id="filter-pessoa"><option value="">Todas</option></select>
+
+    <span class="filter-label">Fluxo:</span>
+    <select id="filter-fluxo"><option value="">Todos</option></select>
+
+    <div class="filter-sep"></div>
+    <button class="btn btn-primary" id="btn-apply">Aplicar</button>
+    <button class="btn btn-ghost"   id="btn-clear">Limpar</button>
+    <span class="filter-count" id="filter-count"></span>
+  </div>
+
+  <!-- M1: KPIs Gerais -->
+  <div class="module active" id="M1">
+    <div class="mod-title">KPIs Gerais</div>
+    <div class="mod-sub">Indicadores consolidados do período selecionado</div>
+    <div id="m1-content"></div>
+  </div>
+
+  <!-- M11: Tarefas em Aberto -->
+  <div class="module" id="M11">
+    <div class="mod-title">Tarefas em Aberto</div>
+    <div class="mod-sub">Todos os tickets em andamento atribuídos ao time</div>
+    <div id="m11-content"></div>
+  </div>
+
+  <!-- M2: Colaboradores -->
+  <div class="module" id="M2">
+    <div class="mod-title">Colaboradores</div>
+    <div class="mod-sub">Horas consumidas, taxa de ocupação e custo por pessoa</div>
+    <div id="m2-content"></div>
+  </div>
+
+  <!-- M3: Por Cliente -->
+  <div class="module" id="M3">
+    <div class="mod-title">Horas por Cliente</div>
+    <div class="mod-sub">Volume de trabalho alocado por cliente no período</div>
+    <div id="m3-content"></div>
+  </div>
+
+  <!-- M4: Fluxos -->
+  <div class="module" id="M4">
+    <div class="mod-title">Ranking de Fluxos de Trabalho</div>
+    <div class="mod-sub">Fluxos que mais consomem capacidade do time</div>
+    <div id="m4-content"></div>
+  </div>
+
+  <!-- M6: Evolução Mensal -->
+  <div class="module" id="M6">
+    <div class="mod-title">Evolução Mensal</div>
+    <div class="mod-sub">Horas consumidas mês a mês</div>
+    <div id="m6-content"></div>
+  </div>
+
+  <!-- M9: Evolutivo de Tarefas -->
+  <div class="module" id="M9">
+    <div class="mod-title">Evolutivo de Tarefas</div>
+    <div class="mod-sub">Volume de tarefas criadas por período — mostra a carga de trabalho ao longo do tempo</div>
+    <div id="m9-content"></div>
+  </div>
+
+  <!-- M10: Comparativo por Fluxo -->
+  <div class="module" id="M10">
+    <div class="mod-title">Comparativo por Fluxo</div>
+    <div class="mod-sub">Evolução de tarefas criadas e tempo médio por fluxo de trabalho</div>
+    <div id="m10-content"></div>
+  </div>
+
+  <!-- MCFG: Configuração -->
+  <div class="module" id="MCFG">
+    <div class="mod-title">Custo / Hora Homem</div>
+    <div class="mod-sub">Defina o valor por hora de cada colaborador. Os dados são salvos no navegador.</div>
+    <div id="mcfg-content"></div>
+  </div>
+
+</main>
+
+<script>
+// === CONFIG ===
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRXHqis26avfM9MtXro49NbbzjQdM-lK34FYvSW6Jcxate4C1wEAgFDa2-DQ6K1mIXABOs3PYinNoJt/pub?output=csv';
+const WORK_HOURS_PER_DAY = 8;
+const STORAGE_KEY         = 'zh3_monthly_salaries';  // armazena salário bruto mensal
+const STORAGE_KEY_CLIENTS = 'zh3_client_revenue';
+const SALARY_DIVISOR      = 220; // horas/mês padrão CLT (44h/semana)
+const PALETTE = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#22c55e','#06b6d4','#f97316','#a78bfa','#34d399','#fb923c','#60a5fa','#f472b6'];
+const PT_MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+// === STATE ===
+let allRows    = [];
+let activeModule = 'M1';
+let monthlySalaries = {}; // { "Nome": salario_bruto_mensal }
+let hourlyRates     = {}; // { "Nome": salario/220 } — calculado automaticamente
+let clientRevenue  = {};  // { "Cliente": valor_mensal }
+let m10ActiveFlows = [];  // flows selected in M10
+const chartStore = {};
+
+// === PARSING ===
+function parseDate(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (!s || s === '-') return null;
+  const p = s.split('/');
+  if (p.length !== 3) return null;
+  const d = parseInt(p[0],10), m = parseInt(p[1],10)-1, y = parseInt(p[2],10);
+  if (isNaN(d)||isNaN(m)||isNaN(y)) return null;
+  const dt = new Date(y,m,d);
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
+function parseTime(raw) {
+  if (!raw) return 0;
+  const s = String(raw).trim();
+  if (!s || s==='-' || s==='00:00:00') return 0;
+  const p = s.split(':');
+  if (p.length < 2) return 0;
+  return (parseInt(p[0],10)||0) + (parseInt(p[1],10)||0)/60 + (parseInt(p[2]||'0',10)||0)/3600;
+}
+
+function clean(v) {
+  if (v===null||v===undefined) return '';
+  const s = String(v).trim();
+  return s==='-' ? '' : s;
+}
+
+function parseLine(line) {
+  const out=[]; let cur='', inQ=false;
+  for (let i=0;i<line.length;i++) {
+    const c=line[i];
+    if (c==='"') { if (inQ&&line[i+1]==='"'){cur+='"';i++;} else inQ=!inQ; }
+    else if (c===','&&!inQ) { out.push(cur); cur=''; }
+    else cur+=c;
+  }
+  out.push(cur);
+  return out;
+}
+
+function normH(h) {
+  return h.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ');
+}
+
+function parseCSV(text) {
+  if (text.charCodeAt(0)===0xFEFF) text=text.slice(1);
+  const lines = text.split('\n').map(l=>l.replace(/\r$/,''));
+  if (lines.length<2) return [];
+  const hdrs = parseLine(lines[0]).map(normH);
+  const idx={};
+  hdrs.forEach((h,i)=>{ idx[h]=i; });
+  function g(cols,name) {
+    const i=idx[normH(name)];
+    return i!==undefined ? clean(cols[i]||'') : '';
+  }
+  const rows=[];
+  for (let i=1;i<lines.length;i++) {
+    if (!lines[i].trim()) continue;
+    const c=parseLine(lines[i]);
+    rows.push({
+      dataCriacao:    parseDate(g(c,'Data de Criação')),
+      criadoPor:      g(c,'Criado Por'),
+      nomeCliente:    g(c,'Nome do Cliente'),
+      nomeProjeto:    g(c,'Nome do Projeto'),
+      idTarefa:       g(c,'ID da Tarefa'),
+      nomeTarefa:     g(c,'Nome da Tarefa'),
+      urgente:        g(c,'Urgente').toLowerCase()==='sim',
+      statusAtual:    g(c,'Status Atual da Tarefa'),
+      tipoTarefa:     g(c,'Tipo da Tarefa'),
+      tempoPrevisto:  parseTime(g(c,'Tempo Total Previsto')),
+      tempoConsumido: parseTime(g(c,'Tempo Total Consumido')),
+      nomeFluxo:      g(c,'Nome do Fluxo'),
+      etapaFluxo:     g(c,'Etapa do Fluxo'),
+      usuario:        g(c,'Usuário'),
+      dataEntrega:    parseDate(g(c,'Data Entrega Cliente')),
+      dataConclusao:  parseDate(g(c,'Data Conclusão')),
+    });
+  }
+  return rows;
+}
+
+// === FILTERING ===
+function filterRows(rows, startDate, endDate, pessoa, fluxo) {
+  return rows.filter(r => {
+    const d = r.dataCriacao;
+    if (!d) return false;
+    if (startDate && d < startDate) return false;
+    if (endDate) {
+      const eod = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()+1);
+      if (d >= eod) return false;
+    }
+    if (pessoa && r.usuario !== pessoa) return false;
+    if (fluxo  && r.nomeFluxo !== fluxo) return false;
+    return true;
+  });
+}
+
+function workingDays(start, end) {
+  if (!start||!end) return 0;
+  let n=0;
+  const cur=new Date(start);
+  const eod=new Date(end.getFullYear(),end.getMonth(),end.getDate()+1);
+  while (cur<eod) { const dow=cur.getDay(); if(dow!==0&&dow!==6) n++; cur.setDate(cur.getDate()+1); }
+  return n;
+}
+
+// === AGGREGATION HELPERS ===
+function groupBy(rows, keyFn) {
+  const map=new Map();
+  for (const r of rows) { const k=keyFn(r); if(!k) continue; if(!map.has(k)) map.set(k,[]); map.get(k).push(r); }
+  return map;
+}
+function sum(rows, field) { return rows.reduce((s,r)=>s+(r[field]||0),0); }
+function fmtH(h) {
+  if (!h||h===0) return '0h00';
+  const hh=Math.floor(h), mm=Math.round((h-hh)*60);
+  if (mm===60) return `${hh+1}h00`;
+  return `${hh}h${String(mm).padStart(2,'0')}`;
+}
+function fmtPct(n,d,fb='—') { if(!d) return fb; return ((n/d)*100).toFixed(1)+'%'; }
+function cssPct(n,d,cap=100) { if(!d) return '0%'; return Math.min(cap,(n/d)*100).toFixed(1)+'%'; }
+function fmtDate(dt) { if(!dt) return '—'; return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`; }
+function fmtBRL(v) { if(!v) return '—'; return v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
+
+function statusBadge(s) {
+  if (!s) return '<span class="badge b-gray">—</span>';
+  const l=s.toLowerCase();
+  if (l.includes('conclu')) return `<span class="badge b-green">${s}</span>`;
+  if (l.includes('progresso')) return `<span class="badge b-blue">${s}</span>`;
+  if (l.includes('paus')||l.includes('espera')) return `<span class="badge b-yellow">${s}</span>`;
+  return `<span class="badge b-gray">${s}</span>`;
+}
+
+function statusColor(s) {
+  if (!s) return 'var(--muted)';
+  const l=s.toLowerCase();
+  if (l.includes('conclu')) return 'var(--green)';
+  if (l.includes('progresso')) return 'var(--accent)';
+  if (l.includes('paus')||l.includes('espera')) return 'var(--yellow)';
+  return 'var(--muted)';
+}
+
+function monthKey(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
+function monthLabel(k) { const [y,m]=k.split('-'); return `${PT_MONTHS[parseInt(m)-1]}/${y.slice(2)}`; }
+
+function killChart(id) { if(chartStore[id]){chartStore[id].destroy();delete chartStore[id];} }
+function mkChart(id,config) { killChart(id); const el=document.getElementById(id); if(!el) return; chartStore[id]=new Chart(el.getContext('2d'),config); }
+
+const CD = { grid:'#2d3148', tick:'#94a3b8', label:'#e2e8f0' };
+
+// === RENDER: M1 — KPIs Gerais ===
+function renderM1(rows) {
+  const total    = rows.length;
+  const consumed = sum(rows,'tempoConsumido');
+  const urgentes = rows.filter(r=>r.urgente).length;
+
+  // Dynamic status map
+  const statusMap = {};
+  rows.forEach(r => {
+    const s = r.statusAtual || 'Sem Status';
+    statusMap[s] = (statusMap[s]||0) + 1;
+  });
+
+  const statusEntries = Object.entries(statusMap).sort((a,b)=>b[1]-a[1]);
+
+  const statusCards = statusEntries.map(([s,n]) => {
+    const color = statusColor(s);
+    return `<div class="kpi-card" style="border-top:2px solid ${color}">
+      <div class="kpi-label">${s}</div>
+      <div class="kpi-value" style="color:${color}">${n}</div>
+      <div class="kpi-sub">${fmtPct(n,total,'0%')} do total</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('m1-content').innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card accent">
+        <div class="kpi-label">Total de Tarefas</div>
+        <div class="kpi-value">${total.toLocaleString('pt-BR')}</div>
+        <div class="kpi-sub">no período</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Horas Consumidas</div>
+        <div class="kpi-value">${fmtH(consumed)}</div>
+        <div class="kpi-sub">total realizado</div>
+      </div>
+      <div class="kpi-card ${urgentes>0?'red':'green'}">
+        <div class="kpi-label">Tarefas Urgentes</div>
+        <div class="kpi-value" style="color:${urgentes>0?'var(--red)':'var(--green)'}">${urgentes}</div>
+        <div class="kpi-sub">${fmtPct(urgentes,total,'0%')} do total</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Volume por Status</div>
+      <div class="kpi-grid" style="margin-bottom:0">${statusCards}</div>
+    </div>
+
+    ${statusEntries.length ? `
+    <div class="card">
+      <div class="card-title">Breakdown completo por Status</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Status</th><th class="t-num">Tarefas</th><th class="t-num">% do Total</th></tr></thead>
+          <tbody>
+            ${statusEntries.map(([s,n])=>`<tr>
+              <td>${statusBadge(s)}</td>
+              <td class="t-num">${n}</td>
+              <td class="t-num">
+                <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
+                  <div class="prog" style="width:80px"><div class="prog-fill" style="width:${cssPct(n,total)};background:${statusColor(s)}"></div></div>
+                  ${fmtPct(n,total)}
+                </div>
+              </td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>` : ''}
+  `;
+}
+
+// === RENDER: M11 — Tarefas em Aberto ===
+function renderM11(rows) {
+  // DEDUPLICAÇÃO por ID de tarefa
+  // Agrupa todas as linhas pelo idTarefa, consolida em 1 registro por tarefa
+  const taskMap = new Map();
+  rows.forEach(r => {
+    const key = r.idTarefa || `__nokey_${r.nomeTarefa}_${r.usuario}`;
+    if (!taskMap.has(key)) {
+      taskMap.set(key, { ...r, tempoConsumido: 0, _linhas: 0 });
+    }
+    const t = taskMap.get(key);
+    t.tempoConsumido += r.tempoConsumido;
+    t._linhas++;
+    // Usa o registro mais recente para status, usuário, cliente, urgente
+    if (r.dataCriacao && (!t._lastDate || r.dataCriacao > t._lastDate)) {
+      t._lastDate   = r.dataCriacao;
+      t.statusAtual = r.statusAtual;
+      t.usuario     = r.usuario;
+      t.nomeCliente = r.nomeCliente;
+      t.urgente     = r.urgente;
+      t.nomeFluxo   = r.nomeFluxo;
+      t.nomeTarefa  = r.nomeTarefa;
+    }
+  });
+
+  // Filtra tarefas em aberto (status não contém "conclu")
+  const abertas = [...taskMap.values()].filter(r => !r.statusAtual.toLowerCase().includes('conclu'));
+
+  // Atualiza badge na sidebar
+  const badge = document.getElementById('badge-M11');
+  if (badge) badge.textContent = abertas.length;
+
+  // Populações para filtros internos
+  const pessoas  = [...new Set(abertas.map(r=>r.usuario).filter(Boolean))].sort();
+  const status   = [...new Set(abertas.map(r=>r.statusAtual).filter(Boolean))].sort();
+  const clientes = [...new Set(abertas.map(r=>r.nomeCliente).filter(Boolean))].sort();
+
+  // Lê filtros internos atuais (preserva seleção ao re-renderizar)
+  const selPessoa  = document.getElementById('m11-pessoa')?.value  || '';
+  const selStatus  = document.getElementById('m11-status')?.value  || '';
+  const selCliente = document.getElementById('m11-cliente')?.value || '';
+  const selUrgente = document.getElementById('m11-urgente')?.value || '';
+  const txtBusca   = document.getElementById('m11-busca')?.value   || '';
+
+  // Aplica filtros internos
+  let lista = abertas.filter(r => {
+    if (selPessoa  && r.usuario     !== selPessoa)  return false;
+    if (selStatus  && r.statusAtual !== selStatus)  return false;
+    if (selCliente && r.nomeCliente !== selCliente) return false;
+    if (selUrgente === 'sim' && !r.urgente)         return false;
+    if (selUrgente === 'nao' && r.urgente)          return false;
+    if (txtBusca) {
+      const q = txtBusca.toLowerCase();
+      const haystack = `${r.nomeTarefa} ${r.idTarefa} ${r.nomeCliente} ${r.usuario} ${r.nomeFluxo}`.toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  });
+
+  // Ordena: urgentes primeiro, depois por data mais recente
+  lista.sort((a,b) => {
+    if (a.urgente !== b.urgente) return a.urgente ? -1 : 1;
+    return (b._lastDate||0) - (a._lastDate||0);
+  });
+
+  const tableRows = lista.map(r => `<tr>
+    <td style="font-size:11px;color:var(--muted);white-space:nowrap">${r.idTarefa||'—'}</td>
+    <td>
+      <div style="font-weight:500;max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.nomeTarefa||''}">${r.nomeTarefa||'—'}</div>
+      ${r.nomeFluxo ? `<div style="font-size:11px;color:var(--muted)">${r.nomeFluxo}</div>` : ''}
+    </td>
+    <td>${r.nomeCliente||'—'}</td>
+    <td>${r.usuario||'—'}</td>
+    <td>${statusBadge(r.statusAtual)}</td>
+    <td class="t-center">${r.urgente ? '<span class="badge b-red">🔴 Sim</span>' : '<span class="badge b-gray">Não</span>'}</td>
+    <td style="font-size:12px;color:var(--muted);white-space:nowrap">${fmtDate(r.dataCriacao)}</td>
+    <td class="t-num" style="font-size:12px;color:var(--muted)">${fmtH(r.tempoConsumido)}</td>
+  </tr>`).join('');
+
+  document.getElementById('m11-content').innerHTML = `
+    <div class="mod-filters">
+      <span class="mod-filter-label">Busca:</span>
+      <input type="text" id="m11-busca" placeholder="Tarefa, cliente, responsável…" value="${txtBusca}"
+        style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:5px 10px;font-size:13px;outline:none;min-width:200px">
+
+      <div class="mod-filter-sep"></div>
+
+      <span class="mod-filter-label">Pessoa:</span>
+      <select id="m11-pessoa">
+        <option value="">Todas</option>
+        ${pessoas.map(p=>`<option value="${p}" ${selPessoa===p?'selected':''}>${p}</option>`).join('')}
+      </select>
+
+      <span class="mod-filter-label">Status:</span>
+      <select id="m11-status">
+        <option value="">Todos</option>
+        ${status.map(s=>`<option value="${s}" ${selStatus===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+
+      <span class="mod-filter-label">Cliente:</span>
+      <select id="m11-cliente">
+        <option value="">Todos</option>
+        ${clientes.map(c=>`<option value="${c}" ${selCliente===c?'selected':''}>${c}</option>`).join('')}
+      </select>
+
+      <span class="mod-filter-label">Urgente:</span>
+      <select id="m11-urgente">
+        <option value="">Todos</option>
+        <option value="sim" ${selUrgente==='sim'?'selected':''}>🔴 Sim</option>
+        <option value="nao" ${selUrgente==='nao'?'selected':''}>Não</option>
+      </select>
+
+      <span style="margin-left:auto;font-size:12px;color:var(--muted)">${lista.length} tarefa${lista.length!==1?'s':''} exibida${lista.length!==1?'s':''}</span>
+    </div>
+
+    ${lista.length === 0 ? '<div class="card"><div class="no-data">Nenhuma tarefa encontrada com os filtros selecionados</div></div>' : `
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Tarefa / Fluxo</th><th>Cliente</th><th>Responsável</th><th>Status</th><th class="t-center">Urgente</th><th>Criado em</th><th class="t-num">H. Consumidas</th></tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+    </div>`}
+  `;
+
+  // Eventos dos filtros internos — re-renderiza ao mudar
+  ['m11-busca','m11-pessoa','m11-status','m11-cliente','m11-urgente'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(id==='m11-busca'?'input':'change', () => renderM11(rows));
+  });
+}
+
+// === RENDER: M2 — Colaboradores (merged: horas + ocupação + custo) ===
+function renderM2(rows, startDate, endDate) {
+  killChart('c-m2');
+  const wDays   = workingDays(startDate, endDate);
+  const capacity = wDays * WORK_HOURS_PER_DAY;
+  const grouped  = groupBy(rows, r=>r.usuario);
+  const data=[];
+  grouped.forEach((ur,name)=>{
+    if (!name) return;
+    const consumed = sum(ur,'tempoConsumido');
+    const rate     = hourlyRates[name] || 0;
+    const cost     = consumed * rate;
+    const pct      = capacity>0 ? (consumed/capacity)*100 : null;
+    data.push({ name, consumed, tasks: ur.length, pct, cost });
+  });
+  data.sort((a,b)=>b.consumed-a.consumed);
+
+  if (!data.length) { document.getElementById('m2-content').innerHTML='<div class="no-data">Nenhum dado no período</div>'; return; }
+
+  const hasRates  = Object.keys(hourlyRates).length > 0;
+  const totalCost = data.reduce((s,d)=>s+d.cost,0);
+
+  const occColor = pct => pct===null?'var(--muted)':pct<80?'var(--green)':pct<=100?'var(--yellow)':'var(--red)';
+
+  const tableRows = data.map(d=>{
+    const oc = occColor(d.pct);
+    const occCell = capacity>0
+      ? `<div style="display:flex;align-items:center;gap:6px">
+           <div class="prog" style="width:70px"><div class="prog-fill" style="width:${Math.min(100,d.pct??0).toFixed(1)}%;background:${oc}"></div></div>
+           <span style="color:${oc};font-weight:700;font-size:12px">${d.pct!==null?d.pct.toFixed(1)+'%':'—'}</span>
+         </div>`
+      : '<span style="color:var(--muted);font-size:12px">Selecione período</span>';
+    return `<tr>
+      <td style="font-weight:500">${d.name}</td>
+      <td class="t-num">${fmtH(d.consumed)}</td>
+      <td class="t-num">${d.tasks}</td>
+      <td>${occCell}</td>
+      <td class="t-num">${hasRates&&d.cost>0 ? fmtBRL(d.cost) : '<span style="color:var(--muted)">—</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  const capInfo = capacity>0
+    ? `<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center">
+        <div><div class="kpi-label">Dias Úteis</div><div style="font-size:22px;font-weight:800">${wDays}</div></div>
+        <div><div class="kpi-label">Capacidade / Pessoa</div><div style="font-size:22px;font-weight:800">${fmtH(capacity)}</div></div>
+        ${hasRates ? `<div><div class="kpi-label">Custo Total</div><div style="font-size:22px;font-weight:800;color:var(--accent)">${fmtBRL(totalCost)}</div></div>` : ''}
+        <div style="margin-left:auto;display:flex;gap:14px;flex-wrap:wrap">
+          <div class="legend-row"><div class="legend-dot" style="background:var(--green)"></div>&lt;80%</div>
+          <div class="legend-row"><div class="legend-dot" style="background:var(--yellow)"></div>80–100%</div>
+          <div class="legend-row"><div class="legend-dot" style="background:var(--red)"></div>&gt;100%</div>
+        </div>
+      </div>`
+    : `<span style="color:var(--muted);font-size:13px">Selecione um período para calcular % de ocupação.</span>`;
+
+  document.getElementById('m2-content').innerHTML = `
+    <div class="card">${capInfo}</div>
+    <div class="card">
+      <div class="card-title">Detalhamento</div>
+      ${!hasRates ? '<div style="font-size:12px;color:var(--yellow);margin-bottom:10px">⚠️ Configure o salário em <b>⚙️ Custo / Hora Homem</b> para ver os custos.</div>' : ''}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Colaborador</th><th class="t-num">H. Consumidas</th><th class="t-num">Tarefas</th><th>Ocupação</th><th class="t-num">Custo</th></tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// === RENDER: M3 — Por Cliente ===
+function renderM3(rows) {
+  killChart('c-m3');
+  const grouped = groupBy(rows, r=>r.nomeCliente);
+  const totalC  = sum(rows,'tempoConsumido');
+  const data=[];
+  grouped.forEach((cr,name)=>{ if(!name) return; data.push({name, consumed:sum(cr,'tempoConsumido'), tasks:cr.length}); });
+  data.sort((a,b)=>b.consumed-a.consumed);
+  if (!data.length) { document.getElementById('m3-content').innerHTML='<div class="no-data">Nenhum dado no período</div>'; return; }
+
+  // Verifica se há dados de custo e receita configurados
+  const hasRates   = Object.keys(hourlyRates).length > 0;
+  const hasRevenue = Object.keys(clientRevenue).length > 0;
+
+  // Calcula custo do time por cliente (soma horas × valor/hora de cada usuário)
+  const costByClient = {};
+  grouped.forEach((cr,name)=>{ if(!name) return;
+    let cost = 0;
+    cr.forEach(r=>{ cost += r.tempoConsumido * (hourlyRates[r.usuario]||0); });
+    costByClient[name] = cost;
+  });
+
+  const showFinancial = hasRates && hasRevenue;
+
+  const tableRows = data.map(d => {
+    const receita = clientRevenue[d.name] || 0;
+    const custo   = costByClient[d.name]  || 0;
+    const margem  = receita > 0 ? receita - custo : null;
+    const margemPct = receita > 0 ? ((margem/receita)*100) : null;
+    const margemColor = margemPct === null ? 'var(--muted)' : margemPct >= 30 ? 'var(--green)' : margemPct >= 0 ? 'var(--yellow)' : 'var(--red)';
+
+    return `<tr>
+      <td style="font-weight:500">${d.name}</td>
+      <td class="t-num">${fmtH(d.consumed)}</td>
+      <td class="t-num">${d.tasks}</td>
+      <td class="t-num">${fmtPct(d.consumed,totalC)}</td>
+      ${showFinancial ? `
+        <td class="t-num">${receita>0 ? fmtBRL(receita) : '<span style="color:var(--muted)">—</span>'}</td>
+        <td class="t-num">${custo>0   ? fmtBRL(custo)   : '<span style="color:var(--muted)">—</span>'}</td>
+        <td class="t-num" style="font-weight:700;color:${margemColor}">
+          ${margem!==null ? fmtBRL(margem) : '<span style="color:var(--muted)">—</span>'}
+          ${margemPct!==null ? `<div style="font-size:11px;font-weight:400">${margemPct.toFixed(1)}% margem</div>` : ''}
+        </td>` : ''}
+    </tr>`;
+  }).join('');
+
+  const extraHeaders = showFinancial
+    ? '<th class="t-num">Receita</th><th class="t-num">Custo Time</th><th class="t-num">Margem</th>'
+    : '';
+
+  const hint = !hasRates || !hasRevenue
+    ? `<div style="font-size:12px;color:var(--yellow);margin-bottom:12px">
+        ⚠️ Configure <b>valor/hora dos colaboradores</b> e <b>receita dos clientes</b> em <b>⚙️ Configuração</b> para ver a análise financeira.
+       </div>` : '';
+
+  document.getElementById('m3-content').innerHTML=`
+    <div class="card">
+      <div class="card-title">Horas Consumidas por Cliente</div>
+      <div class="chart-wrap" style="height:300px"><canvas id="c-m3"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Detalhamento por Cliente</div>
+      ${hint}
+      <div class="table-wrap"><table>
+        <thead><tr><th>Cliente</th><th class="t-num">H. Consumidas</th><th class="t-num">Tarefas</th><th class="t-num">% do Total</th>${extraHeaders}</tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table></div>
+    </div>`;
+
+  mkChart('c-m3',{
+    type:'bar',
+    data:{ labels:data.map(d=>d.name), datasets:[{label:'Horas',data:data.map(d=>+d.consumed.toFixed(2)),backgroundColor:PALETTE.slice(0,data.length),borderRadius:4}] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${fmtH(ctx.parsed.y)}`}}},
+      scales:{x:{grid:{color:'transparent'},ticks:{color:CD.label,maxRotation:30}},y:{grid:{color:CD.grid},ticks:{color:CD.tick,callback:v=>fmtH(v)}}}
+    }
+  });
+}
+
+// === RENDER: M4 — Fluxos de Trabalho ===
+function renderM4(rows) {
+  const grouped = groupBy(rows, r=>r.nomeFluxo);
+  const data=[];
+  grouped.forEach((fr,name)=>{ if(!name) return; const c=sum(fr,'tempoConsumido'); data.push({name,consumed:c,tasks:fr.length,avg:fr.length?c/fr.length:0}); });
+  data.sort((a,b)=>b.consumed-a.consumed);
+  if (!data.length) { document.getElementById('m4-content').innerHTML='<div class="no-data">Nenhum dado no período</div>'; return; }
+  const maxC=data[0].consumed||1;
+  document.getElementById('m4-content').innerHTML=`
+    <div class="card">
+      <div class="card-title">Ranking por Horas Consumidas</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Fluxo</th><th class="t-num">H. Consumidas</th><th class="t-num">Tarefas</th><th class="t-num">Média/Tarefa</th></tr></thead>
+        <tbody>${data.map((d,i)=>`<tr>
+          <td><div style="display:flex;align-items:center;gap:8px">
+            <span class="rank-num">${i+1}</span>
+            <div>${d.name}<div class="prog" style="margin-top:3px;width:160px"><div class="prog-fill" style="width:${cssPct(d.consumed,maxC)};background:var(--accent)"></div></div></div>
+          </div></td>
+          <td class="t-num">${fmtH(d.consumed)}</td>
+          <td class="t-num">${d.tasks}</td>
+          <td class="t-num">${fmtH(d.avg)}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>`;
+}
+
+// === RENDER: M6 — Evolução Mensal ===
+function renderM6(rows) {
+  killChart('c-m6');
+  const mMap=new Map();
+  rows.forEach(r=>{ if(!r.dataCriacao) return; const k=monthKey(r.dataCriacao); if(!mMap.has(k)) mMap.set(k,{consumed:0,tasks:0}); const m=mMap.get(k); m.consumed+=r.tempoConsumido; m.tasks++; });
+  const months=[...mMap.keys()].sort();
+  if (months.length<2) { document.getElementById('m6-content').innerHTML='<div class="card"><div class="no-data">Exibido quando o período abrange mais de 1 mês.<br>Use "Todos os dados" ou um período personalizado.</div></div>'; return; }
+  document.getElementById('m6-content').innerHTML=`<div class="card"><div class="card-title">Horas Consumidas por Mês</div><div class="chart-wrap" style="height:320px"><canvas id="c-m6"></canvas></div></div>`;
+  mkChart('c-m6',{
+    type:'line',
+    data:{ labels:months.map(monthLabel), datasets:[{ label:'Horas Consumidas', data:months.map(k=>+mMap.get(k).consumed.toFixed(2)), borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,.12)', fill:true, tension:.35, pointRadius:5, pointBackgroundColor:'#6366f1' }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:CD.label,font:{size:12}}},tooltip:{callbacks:{label:ctx=>` ${fmtH(ctx.parsed.y)}`}}},
+      scales:{x:{grid:{color:CD.grid},ticks:{color:CD.tick}},y:{grid:{color:CD.grid},ticks:{color:CD.tick,callback:v=>fmtH(v)}}}
+    }
+  });
+}
+
+// === RENDER: M8 — Tipos & Status ===
+function renderM8(rows) {
+  killChart('c-m8-status'); killChart('c-m8-tipo');
+  const byStatus={}, byTipo={};
+  rows.forEach(r=>{ const s=r.statusAtual||'Sem Status'; byStatus[s]=(byStatus[s]||0)+1; const t=r.tipoTarefa||'Sem Tipo'; byTipo[t]=(byTipo[t]||0)+1; });
+  const sE=Object.entries(byStatus).sort((a,b)=>b[1]-a[1]);
+  const tE=Object.entries(byTipo).sort((a,b)=>b[1]-a[1]);
+  if (!sE.length&&!tE.length) { document.getElementById('m8-content').innerHTML='<div class="no-data">Nenhum dado no período</div>'; return; }
+  document.getElementById('m8-content').innerHTML=`
+    <div class="grid-2">
+      <div class="card"><div class="card-title">Por Status</div><div class="chart-wrap" style="height:300px;max-width:340px;margin:0 auto"><canvas id="c-m8-status"></canvas></div></div>
+      <div class="card"><div class="card-title">Por Tipo de Tarefa</div><div class="chart-wrap" style="height:300px"><canvas id="c-m8-tipo"></canvas></div></div>
+    </div>`;
+  if (sE.length) mkChart('c-m8-status',{ type:'doughnut', data:{labels:sE.map(e=>e[0]),datasets:[{data:sE.map(e=>e[1]),backgroundColor:PALETTE,borderColor:'#1a1d27',borderWidth:2}]}, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:CD.label,font:{size:11},padding:10}},tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.parsed} (${fmtPct(ctx.parsed,rows.length)})`}}}} });
+  if (tE.length) mkChart('c-m8-tipo',{ type:'bar', data:{labels:tE.map(e=>e[0]),datasets:[{label:'Tarefas',data:tE.map(e=>e[1]),backgroundColor:PALETTE.slice(0,tE.length),borderRadius:4}]}, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'transparent'},ticks:{color:CD.label,font:{size:11}}},y:{grid:{color:CD.grid},ticks:{color:CD.tick},beginAtZero:true}}} });
+}
+
+// === RENDER: M9 — Evolutivo de Tarefas ===
+function renderM9(rows) {
+  killChart('c-m9');
+
+  const mMap = new Map();
+  rows.forEach(r => {
+    if (!r.dataCriacao) return;
+    const k = monthKey(r.dataCriacao);
+    if (!mMap.has(k)) mMap.set(k, { total:0, status:{} });
+    const m = mMap.get(k);
+    m.total++;
+    const s = r.statusAtual || 'Sem Status';
+    m.status[s] = (m.status[s]||0) + 1;
+  });
+
+  const months = [...mMap.keys()].sort();
+
+  if (!months.length) { document.getElementById('m9-content').innerHTML='<div class="no-data">Nenhum dado no período</div>'; return; }
+
+  // KPIs
+  const totals = months.map(k=>mMap.get(k).total);
+  const maxVal = Math.max(...totals);
+  const avgVal = (totals.reduce((s,v)=>s+v,0)/totals.length).toFixed(1);
+  const totalTasks = totals.reduce((s,v)=>s+v,0);
+
+  // Get all status keys across all months
+  const allStatus = [...new Set(rows.map(r=>r.statusAtual||'Sem Status'))];
+
+  // Build stacked datasets
+  const datasets = allStatus.map((s,i) => ({
+    label: s,
+    data: months.map(k => mMap.get(k).status[s]||0),
+    backgroundColor: PALETTE[i % PALETTE.length],
+    borderRadius: 2,
+    stack: 'stack',
+  }));
+
+  document.getElementById('m9-content').innerHTML = `
+    <div class="kpi-grid" style="margin-bottom:16px">
+      <div class="kpi-card accent"><div class="kpi-label">Total no Período</div><div class="kpi-value">${totalTasks.toLocaleString('pt-BR')}</div><div class="kpi-sub">tarefas criadas</div></div>
+      <div class="kpi-card"><div class="kpi-label">Média Mensal</div><div class="kpi-value">${avgVal}</div><div class="kpi-sub">tarefas / mês</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Mês com Mais Tarefas</div><div class="kpi-value" style="color:var(--green)">${maxVal}</div><div class="kpi-sub">${monthLabel(months[totals.indexOf(maxVal)])}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Tarefas Criadas por Mês (por Status)</div>
+      <div class="chart-wrap" style="height:340px"><canvas id="c-m9"></canvas></div>
+    </div>`;
+
+  mkChart('c-m9', {
+    type: 'bar',
+    data: { labels: months.map(monthLabel), datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position:'bottom', labels:{color:CD.label,font:{size:11},padding:10} }, tooltip:{mode:'index',intersect:false} },
+      scales: {
+        x: { stacked:true, grid:{color:'transparent'}, ticks:{color:CD.label} },
+        y: { stacked:true, grid:{color:CD.grid}, ticks:{color:CD.tick}, beginAtZero:true }
+      }
+    }
+  });
+}
+
+// === RENDER: M10 — Comparativo por Fluxo ===
+function renderM10(rows) {
+  killChart('c-m10-tasks'); killChart('c-m10-avg');
+
+  // Get top flows by total tasks
+  const flowTotals = new Map();
+  rows.forEach(r=>{ if(!r.nomeFluxo) return; flowTotals.set(r.nomeFluxo,(flowTotals.get(r.nomeFluxo)||0)+1); });
+  const topFlows = [...flowTotals.entries()].sort((a,b)=>b[1]-a[1]).slice(0,8).map(e=>e[0]);
+
+  if (!topFlows.length) { document.getElementById('m10-content').innerHTML='<div class="no-data">Nenhum dado no período</div>'; return; }
+
+  // Init selected flows if not set or if flows changed
+  if (!m10ActiveFlows.length || !m10ActiveFlows.some(f=>topFlows.includes(f))) {
+    m10ActiveFlows = topFlows.slice(0,4);
+  }
+
+  // Build month × flow matrix
+  const months = [...new Set(rows.filter(r=>r.dataCriacao).map(r=>monthKey(r.dataCriacao)))].sort();
+
+  const matrix = {}; // matrix[flow][month] = { tasks, totalTime }
+  topFlows.forEach(f=>{ matrix[f]={}; months.forEach(m=>{ matrix[f][m]={tasks:0,totalTime:0}; }); });
+  rows.forEach(r=>{
+    if (!r.nomeFluxo||!r.dataCriacao) return;
+    if (!matrix[r.nomeFluxo]) return;
+    const m=monthKey(r.dataCriacao);
+    if (!matrix[r.nomeFluxo][m]) return;
+    matrix[r.nomeFluxo][m].tasks++;
+    matrix[r.nomeFluxo][m].totalTime += r.tempoConsumido;
+  });
+
+  const activeFlows = m10ActiveFlows.filter(f=>topFlows.includes(f));
+
+  const chips = topFlows.map(f=>`<button class="flow-chip ${activeFlows.includes(f)?'active':''}" data-flow="${f}">${f}</button>`).join('');
+
+  document.getElementById('m10-content').innerHTML = `
+    <div class="card" style="margin-bottom:0">
+      <div class="card-title">Selecione os fluxos para comparar (top 8 por volume)</div>
+      <div class="flow-selector" id="flow-chips">${chips}</div>
+    </div>
+    <div class="grid-2" style="margin-top:16px">
+      <div class="card"><div class="card-title">Tarefas Criadas por Mês</div><div class="chart-wrap" style="height:300px"><canvas id="c-m10-tasks"></canvas></div></div>
+      <div class="card"><div class="card-title">Tempo Médio por Tarefa (horas)</div><div class="chart-wrap" style="height:300px"><canvas id="c-m10-avg"></canvas></div></div>
+    </div>`;
+
+  // Chip click events
+  document.querySelectorAll('#flow-chips .flow-chip').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const f=btn.dataset.flow;
+      if (m10ActiveFlows.includes(f)) { if(m10ActiveFlows.length>1) m10ActiveFlows=m10ActiveFlows.filter(x=>x!==f); }
+      else m10ActiveFlows.push(f);
+      renderM10(rows);
+    });
+  });
+
+  if (!months.length) return;
+  const labels = months.map(monthLabel);
+
+  const taskDatasets = activeFlows.map((f,i)=>({
+    label: f, data: months.map(m=>matrix[f][m]?.tasks||0),
+    borderColor: PALETTE[i%PALETTE.length], backgroundColor: PALETTE[i%PALETTE.length]+'33',
+    fill: false, tension:.3, pointRadius:4, pointBackgroundColor: PALETTE[i%PALETTE.length],
+  }));
+
+  const avgDatasets = activeFlows.map((f,i)=>({
+    label: f, data: months.map(m=>{ const e=matrix[f][m]; return e&&e.tasks>0 ? +( e.totalTime/e.tasks).toFixed(2):0; }),
+    borderColor: PALETTE[i%PALETTE.length], backgroundColor: PALETTE[i%PALETTE.length]+'33',
+    fill: false, tension:.3, pointRadius:4, pointBackgroundColor: PALETTE[i%PALETTE.length],
+  }));
+
+  const lineOpts = (yLabel) => ({
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{position:'bottom',labels:{color:CD.label,font:{size:11},padding:8}} },
+    scales:{
+      x:{grid:{color:CD.grid},ticks:{color:CD.tick}},
+      y:{grid:{color:CD.grid},ticks:{color:CD.tick,callback:yLabel},beginAtZero:true}
+    }
+  });
+
+  mkChart('c-m10-tasks',{ type:'line', data:{labels,datasets:taskDatasets}, options:lineOpts(v=>v) });
+  mkChart('c-m10-avg',  { type:'line', data:{labels,datasets:avgDatasets},  options:lineOpts(v=>fmtH(v)) });
+}
+
+// === RENDER: MCFG — Configuração Custo/Hora ===
+function renderMCFG(rows) {
+  // Get all collaborators from full dataset (not just filtered)
+  const pessoas = [...new Set(allRows.map(r=>r.usuario).filter(Boolean))].sort();
+
+  const tableRows = pessoas.map(p => {
+    const salario  = monthlySalaries[p] || '';
+    const vhora    = monthlySalaries[p] > 0 ? monthlySalaries[p] / SALARY_DIVISOR : 0;
+    const safeKey  = p.replace(/\s+/g,'_');
+    return `<tr>
+      <td style="font-weight:500">${p}</td>
+      <td><input type="number" class="rate-input" data-pessoa="${p}" value="${salario}" placeholder="ex: 3500.00" min="0" step="0.01"></td>
+      <td class="t-num" style="color:var(--muted);font-size:12px" id="rate-display-${safeKey}">${vhora > 0 ? 'R$ '+Number(vhora).toLocaleString('pt-BR',{minimumFractionDigits:2})+'/h' : '—'}</td>
+      <td style="font-size:11px;color:var(--green);width:60px" id="rate-saved-${safeKey}"></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('mcfg-content').innerHTML=`
+    <div class="card">
+      <div class="card-title">Salário Bruto Mensal por Colaborador</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
+        Informe o <b>salário bruto mensal</b> de cada colaborador. O sistema calcula automaticamente o valor/hora usando o divisor CLT padrão (÷ 220 horas). Salva automaticamente no navegador. ✅
+      </p>
+      <p style="font-size:12px;color:var(--accent);margin-bottom:14px;font-style:italic">
+        Fórmula: Valor/hora = Salário bruto ÷ 220
+      </p>
+      <div class="table-wrap cfg-table"><table>
+        <thead><tr><th>Colaborador</th><th>Salário Bruto (R$)</th><th class="t-num">Valor / Hora calculado</th><th></th></tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table></div>
+    </div>`;
+
+  // Auto-save colaboradores ao mudar campo
+  document.querySelectorAll('.rate-input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const p = inp.dataset.pessoa;
+      const v = parseFloat(inp.value);
+      if (!p) return;
+      const safeKey = p.replace(/\s+/g,'_');
+      monthlySalaries[p] = isNaN(v) || v <= 0 ? 0 : v;
+      hourlyRates[p]     = monthlySalaries[p] > 0 ? monthlySalaries[p] / SALARY_DIVISOR : 0;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(monthlySalaries));
+      const dispEl  = document.getElementById('rate-display-' + safeKey);
+      const savedEl = document.getElementById('rate-saved-'   + safeKey);
+      if (dispEl)  dispEl.textContent = hourlyRates[p] > 0 ? 'R$ '+Number(hourlyRates[p]).toLocaleString('pt-BR',{minimumFractionDigits:2})+'/h' : '—';
+      if (savedEl) { savedEl.textContent='✓ Salvo'; setTimeout(()=>{ savedEl.textContent=''; },2000); }
+    });
+  });
+
+  // === Card de Receita por Cliente ===
+  const clientes = [...new Set(allRows.map(r=>r.nomeCliente).filter(Boolean))].sort();
+
+  const clientRows = clientes.map(c => {
+    const safeId = c.replace(/\W+/g,'_');
+    return `<tr>
+      <td style="font-weight:500">${c}</td>
+      <td><input type="number" class="rev-input" data-cliente="${c}" value="${clientRevenue[c]||''}" placeholder="ex: 5000.00" min="0" step="0.01"></td>
+      <td class="t-num" style="color:var(--muted);font-size:12px" id="rev-display-${safeId}">${clientRevenue[c]>0 ? 'R$ '+Number(clientRevenue[c]).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '—'}</td>
+      <td style="font-size:11px;color:var(--green);width:60px" id="rev-saved-${safeId}"></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('mcfg-content').insertAdjacentHTML('beforeend', `
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">Receita Mensal por Cliente (R$)</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
+        Informe o valor mensal de cada cliente. Usado para comparar receita × custo do time no módulo <b>Por Cliente</b>. Salva automaticamente. ✅
+      </p>
+      <div class="table-wrap cfg-table"><table>
+        <thead><tr><th>Cliente</th><th>Receita Mensal (R$)</th><th class="t-num">Valor salvo</th><th></th></tr></thead>
+        <tbody>${clientRows}</tbody>
+      </table></div>
+    </div>`);
+
+  // Auto-save clientes ao mudar campo
+  document.querySelectorAll('.rev-input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const c   = inp.dataset.cliente;
+      const v   = parseFloat(inp.value);
+      if (!c) return;
+      clientRevenue[c] = isNaN(v) || v <= 0 ? 0 : v;
+      localStorage.setItem(STORAGE_KEY_CLIENTS, JSON.stringify(clientRevenue));
+      const safeId  = c.replace(/\W+/g,'_');
+      const dispEl  = document.getElementById('rev-display-' + safeId);
+      const savedEl = document.getElementById('rev-saved-'   + safeId);
+      if (dispEl)  dispEl.textContent = clientRevenue[c] > 0 ? 'R$ '+Number(clientRevenue[c]).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '—';
+      if (savedEl) { savedEl.textContent='✓ Salvo'; setTimeout(()=>{ savedEl.textContent=''; },2000); }
+    });
+  });
+}
+
+// === NAVIGATION ===
+function showModule(id) {
+  document.querySelectorAll('.module').forEach(m=>m.classList.remove('active'));
+  document.querySelectorAll('.nav-item[data-module]').forEach(n=>n.classList.remove('active'));
+  const mod=document.getElementById(id); if(mod) mod.classList.add('active');
+  const nav=document.querySelector(`[data-module="${id}"]`); if(nav) nav.classList.add('active');
+  activeModule=id;
+
+  // M6 mostra sempre o período todo por padrão
+  if (id === 'M6') {
+    document.getElementById('filter-mode').value = 'all';
+    document.getElementById('fg-month').style.display  = 'none';
+    document.getElementById('fg-custom').style.display = 'none';
+  }
+
+  applyFilter();
+}
+
+// === FILTER LOGIC ===
+function getFilterDates() {
+  const mode=document.getElementById('filter-mode').value;
+  if (mode==='all') return {startDate:null,endDate:null};
+  if (mode==='month') {
+    const val=document.getElementById('filter-month').value;
+    if (!val) return {startDate:null,endDate:null};
+    const [y,m]=val.split('-').map(Number);
+    return {startDate:new Date(y,m-1,1), endDate:new Date(y,m,0)};
+  }
+  if (mode==='custom') {
+    const s=document.getElementById('filter-start').value, e=document.getElementById('filter-end').value;
+    return { startDate:s?new Date(s+'T00:00:00'):null, endDate:e?new Date(e+'T00:00:00'):null };
+  }
+  return {startDate:null,endDate:null};
+}
+
+function applyFilter() {
+  const {startDate,endDate}=getFilterDates();
+  const pessoa = document.getElementById('filter-pessoa').value;
+  const fluxo  = document.getElementById('filter-fluxo').value;
+  const filtered = filterRows(allRows, startDate, endDate, pessoa, fluxo);
+
+  const ce=document.getElementById('filter-count');
+  if (ce) ce.textContent=`${filtered.length.toLocaleString('pt-BR')} registro${filtered.length!==1?'s':''}`;
+
+  // Badge de tarefas em aberto sempre atualizado
+  const badge = document.getElementById('badge-M11');
+  if (badge) badge.textContent = filtered.filter(r => !r.statusAtual.toLowerCase().includes('conclu')).length;
+
+  switch(activeModule) {
+    case 'M1':   renderM1(filtered); break;
+    case 'M11':  renderM11(filtered); break;
+    case 'M2':   renderM2(filtered, startDate, endDate); break;
+    case 'M3':   renderM3(filtered); break;
+    case 'M4':   renderM4(filtered); break;
+    case 'M6':   renderM6(filtered); break;
+    case 'M9':   renderM9(filtered); break;
+    case 'M10':  renderM10(filtered); break;
+    case 'MCFG': renderMCFG(filtered); break;
+  }
+}
+
+function populateFilterSelects() {
+  const pessoas=[...new Set(allRows.map(r=>r.usuario).filter(Boolean))].sort();
+  const fluxos=[...new Set(allRows.map(r=>r.nomeFluxo).filter(Boolean))].sort();
+  const sp=document.getElementById('filter-pessoa');
+  sp.innerHTML='<option value="">Todas as pessoas</option>'+pessoas.map(p=>`<option value="${p}">${p}</option>`).join('');
+  const sf=document.getElementById('filter-fluxo');
+  sf.innerHTML='<option value="">Todos os fluxos</option>'+fluxos.map(f=>`<option value="${f}">${f}</option>`).join('');
+}
+
+// === INIT ===
+async function init() {
+  document.getElementById('loader').style.display='flex';
+  document.getElementById('error-panel').style.display='none';
+  document.getElementById('header-status').style.display='none';
+
+  // Load saved hourly rates
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      monthlySalaries = JSON.parse(saved);
+      // Recalcula valor/hora a partir do salário bruto
+      Object.entries(monthlySalaries).forEach(([k,v]) => { hourlyRates[k] = v > 0 ? v / SALARY_DIVISOR : 0; });
+    }
+  } catch(e) {}
+  try { const saved=localStorage.getItem(STORAGE_KEY_CLIENTS); if(saved) clientRevenue=JSON.parse(saved); } catch(e){}
+
+  // Default to current month
+  const now=new Date();
+  document.getElementById('filter-month').value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+
+  // Filter mode toggle
+  document.getElementById('filter-mode').addEventListener('change',function(){
+    document.getElementById('fg-month').style.display  =this.value==='month'?'flex':'none';
+    document.getElementById('fg-custom').style.display =this.value==='custom'?'flex':'none';
+  });
+
+  document.getElementById('btn-apply').addEventListener('click',applyFilter);
+  document.getElementById('btn-clear').addEventListener('click',()=>{
+    document.getElementById('filter-mode').value='all';
+    document.getElementById('filter-pessoa').value='';
+    document.getElementById('filter-fluxo').value='';
+    document.getElementById('fg-month').style.display='none';
+    document.getElementById('fg-custom').style.display='none';
+    applyFilter();
+  });
+
+  document.querySelectorAll('.nav-item[data-module]').forEach(el=>{
+    el.addEventListener('click',()=>showModule(el.dataset.module));
+  });
+
+  try {
+    const res=await fetch(CSV_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    const text=await res.text();
+    allRows=parseCSV(text);
+    if (!allRows.length) throw new Error('Nenhuma linha de dados encontrada.\nVerifique se a planilha está publicada como CSV público.');
+
+    document.getElementById('loader').style.display='none';
+    document.getElementById('header-rows').textContent=allRows.length.toLocaleString('pt-BR');
+    document.getElementById('header-status').style.display='flex';
+
+    populateFilterSelects();
+    applyFilter();
+
+  } catch(err) {
+    document.getElementById('loader').style.display='none';
+    document.getElementById('error-panel').style.display='flex';
+    document.getElementById('error-msg').textContent=`${err.message}\n\nDica: certifique-se de que a planilha está publicada em:\nArquivo → Compartilhar → Publicar na Web → CSV`;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
