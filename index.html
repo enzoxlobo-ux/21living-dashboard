@@ -201,7 +201,9 @@ tbody tr:hover td { background: rgba(232,160,32,.04); }
   <div class="header-status" id="header-status" style="display:none">
     <div class="header-dot"></div>
     <span id="header-rows">—</span> registros
+    <span id="header-updated" style="color:var(--muted);font-size:10px;margin-left:4px"></span>
   </div>
+  <button onclick="reloadData()" id="btn-reload" style="margin-left:12px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.25);color:var(--accent);border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s" title="Recarregar dados da planilha">↻ Atualizar</button>
 </header>
 
 <!-- SIDEBAR -->
@@ -1254,7 +1256,7 @@ async function init() {
   });
 
   try {
-    const res=await fetch(CSV_URL);
+    const res=await fetch(CSV_URL + '&t=' + Date.now(), { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     const text=await res.text();
     allRows=parseCSV(text);
@@ -1263,6 +1265,8 @@ async function init() {
     document.getElementById('loader').style.display='none';
     document.getElementById('header-rows').textContent=allRows.length.toLocaleString('pt-BR');
     document.getElementById('header-status').style.display='flex';
+    const now2=new Date();
+    document.getElementById('header-updated').textContent=`· atualizado às ${String(now2.getHours()).padStart(2,'0')}:${String(now2.getMinutes()).padStart(2,'0')}`;
 
     populateFilterSelects();
     applyFilter();
@@ -1272,6 +1276,15 @@ async function init() {
     document.getElementById('error-panel').style.display='flex';
     document.getElementById('error-msg').textContent=`${err.message}\n\nDica: certifique-se de que a planilha está publicada em:\nArquivo → Compartilhar → Publicar na Web → CSV`;
   }
+}
+
+async function reloadData() {
+  const btn = document.getElementById('btn-reload');
+  btn.textContent = '↻ Carregando…';
+  btn.disabled = true;
+  await init();
+  btn.textContent = '↻ Atualizar';
+  btn.disabled = false;
 }
 
 document.addEventListener('DOMContentLoaded', init);
