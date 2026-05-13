@@ -1262,6 +1262,18 @@ async function init() {
     allRows=parseCSV(text);
     if (!allRows.length) throw new Error('Nenhuma linha de dados encontrada.\nVerifique se a planilha está publicada como CSV público.');
 
+    // === DIAGNÓSTICO (pode remover depois) ===
+    const _clientes = [...new Set(allRows.map(r=>r.nomeCliente).filter(Boolean))];
+    const _pessoas  = [...new Set(allRows.map(r=>r.usuario).filter(Boolean))];
+    const _datas    = allRows.map(r=>r.dataCriacao).filter(Boolean).sort((a,b)=>b-a);
+    console.log('%c[Dashboard Diagnóstico]', 'color:#e8a020;font-weight:bold;font-size:14px');
+    console.log('Total de linhas lidas:', allRows.length);
+    console.log('Clientes únicos (' + _clientes.length + '):', _clientes);
+    console.log('Colaboradores únicos (' + _pessoas.length + '):', _pessoas);
+    console.log('Data mais recente:', _datas[0] ? _datas[0].toLocaleDateString('pt-BR') : 'nenhuma');
+    console.log('Data mais antiga:', _datas[_datas.length-1] ? _datas[_datas.length-1].toLocaleDateString('pt-BR') : 'nenhuma');
+    // === FIM DIAGNÓSTICO ===
+
     document.getElementById('loader').style.display='none';
     document.getElementById('header-rows').textContent=allRows.length.toLocaleString('pt-BR');
     document.getElementById('header-status').style.display='flex';
